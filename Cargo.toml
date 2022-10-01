@@ -1,0 +1,20 @@
+[package]
+name = "rust_space_invader"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Resources
+# https://github.com/bevyengine/bevy/blob/latest/examples/games/breakout.rs
+
+[dependencies]
+bevy = { version = "0.8", features = ["dynamic"] }
+
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
