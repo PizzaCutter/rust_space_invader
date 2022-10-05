@@ -5,41 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'rust_space_invader'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=rust_space_invader",
-                    "--package=rust_space_invader"
-                ],
-                "filter": {
-                    "name": "rust_space_invader",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'rust_space_invader'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=rust_space_invader",
-                    "--package=rust_space_invader"
-                ],
-                "filter": {
-                    "name": "rust_space_invader",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+    "type": "lldb",
+    "request": "launch",
+    "name": "Debug example 'breakout'",
+    "cargo": {
+        "args": [
+            "build",
+            "--example=breakout",
+            "--package=bevy"
+        ],
+        "filter": {
+            "name": "breakout",
+            "kind": "example"
         }
+        },
+        "args": [],
+        "cwd": "${workspaceFolder}",
+        "env": {
+            "CARGO_MANIFEST_DIR": "${workspaceFolder}",
+        }
+    }
     ]
 }

@@ -7,15 +7,17 @@ use bevy::{
 // Defines the amount of time that should elapse between each physics step.
 const TIME_STEP: f32 = 1.0 / 60.0;
 
-// These constants are defined in `Transform` units.
-// Using the default 2D camera they correspond 1:1 with screen pixels.
+// PADDLE DATA
 const PADDLE_SIZE: Vec3 = Vec3::new(120.0, 20.0, 0.0);
 const PADDLE_SPEED : f32 = 500.0;
 const PADDLE_COLOR: Color = Color::rgb(0.3, 0.3, 0.7);
-// How close can the paddle get to the wall
-const PADDLE_PADDING: f32 = 0.0;
 
-const WALL_THICKNESS: f32 = 0.0;
+// PROJECTILE DATA
+const PROJECTILE_SIZE: Vec3 = Vec3::new(20.0, 20.0, 20.0);
+const PROJECTILE_COLOR: Color = Color::rgb(0.3, 0.3, 0.7);
+const PROJECTILE_SPEED : f32 = 400.0;
+const INITIAL_BALL_DIRECTION: Vec2 = Vec2::new(0.0, 1.0);
+
 // x coordinates
 const LEFT_WALL: f32 = -600.;
 const RIGHT_WALL: f32 = 600.;
@@ -23,6 +25,7 @@ const RIGHT_WALL: f32 = 600.;
 const BOTTOM_WALL: f32 = -300.;
 const TOP_WALL: f32 = 300.;
 
+// UI DATA
 const SCOREBOARD_FONT_SIZE: f32 = 40.0;
 const SCOREBOARD_TEXT_PADDING: Val = Val::Px(5.0);
 const TEXT_COLOR: Color = Color::rgb(0.5, 0.5, 1.0);
@@ -49,12 +52,24 @@ impl Plugin for SpaceInvader{
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(move_player)
+                .with_system(system_spawn_projectile)
+                .with_system(system_apply_velocity)
+                .with_system(system_lifetime)
         );
     }
 }
 
+#[derive(Component, Deref, DerefMut)]
+struct Velocity(Vec2);
+
 #[derive(Component)]
 struct Player;
+
+#[derive(Component)]
+struct Projectile;
+
+#[derive(Component, Deref, DerefMut)]
+struct LifeTime(f32);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Camera
@@ -105,7 +120,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     );
 }
 
-fn move_player(keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut Transform, With<Player>>) {
+fn move_player(mut commands: Commands, keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut Transform, With<Player>>) {
     let mut player_transform = query.single_mut();
     let mut direction = 0.0;
 
@@ -120,9 +135,51 @@ fn move_player(keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut Transf
 
     // Update the paddle position,
     // making sure it doesn't cause the paddle to leave the arena
-    let left_bound = LEFT_WALL + WALL_THICKNESS / 2.0 + PADDLE_SIZE.x / 2.0 + PADDLE_PADDING;
-    let right_bound = RIGHT_WALL - WALL_THICKNESS / 2.0 - PADDLE_SIZE.x / 2.0 - PADDLE_PADDING;
+    let left_bound = LEFT_WALL +  PADDLE_SIZE.x / 2.0;
+    let right_bound = RIGHT_WALL - PADDLE_SIZE.x / 2.0;
 
     player_transform.translation.x = new_player_position.clamp(left_bound, right_bound);
+}
+
+fn system_spawn_projectile(mut commands: Commands, keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut Transform, With<Player>>, mut projectile_query: Query<&Projectile>) {
+    let mut player_transform = query.single_mut();
+
+    if projectile_query.is_empty() {
+        if keyboard_input.pressed(KeyCode::Space) {
+        commands
+            .spawn()
+            .insert(Projectile)
+            .insert(Velocity(INITIAL_BALL_DIRECTION.normalize()))
+            .insert(LifeTime(3.0))
+            .insert_bundle(SpriteBundle {
+                transform: Transform {
+                translation: player_transform.translation,
+                scale: PROJECTILE_SIZE,
+                ..default()
+            },
+            sprite: Sprite {
+                color: PROJECTILE_COLOR,
+                ..default()
+            },
+            ..default()
+        });
+    }
+    }
+}
+
+fn system_apply_velocity(mut commands: Commands, mut query: Query<(Entity, &mut Transform, &Velocity)>) {
+    for (entity, mut transform, velocity) in &mut query {
+        transform.translation.x = transform.translation.x + velocity.x;
+        transform.translation.y = transform.translation.y + velocity.y;
+    }
+}
+
+fn system_lifetime(mut commands: Commands, mut query: Query<(Entity, &mut LifeTime)>) {
+    for (entity, mut lifetime) in &mut query {
+        lifetime.0 = lifetime.0 - TIME_STEP;
+        if lifetime.0 <= 0.0 {
+            commands.entity(entity).despawn();
+        }
+    }
 }
 
