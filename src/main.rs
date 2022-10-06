@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    sprite::collide_aabb::{collide, Collision},
+    //sprite::collide_aabb::{collide, Collision},
     time::FixedTimestep
 };
 
@@ -15,7 +15,6 @@ const PADDLE_COLOR: Color = Color::rgb(0.3, 0.3, 0.7);
 // PROJECTILE DATA
 const PROJECTILE_SIZE: Vec3 = Vec3::new(20.0, 20.0, 20.0);
 const PROJECTILE_COLOR: Color = Color::rgb(0.3, 0.3, 0.7);
-const PROJECTILE_SPEED : f32 = 400.0;
 const INITIAL_BALL_DIRECTION: Vec2 = Vec2::new(0.0, 1.0);
 
 // x coordinates
@@ -120,7 +119,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     );
 }
 
-fn move_player(mut commands: Commands, keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut Transform, With<Player>>) {
+fn move_player(keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut Transform, With<Player>>) {
     let mut player_transform = query.single_mut();
     let mut direction = 0.0;
 
@@ -137,22 +136,23 @@ fn move_player(mut commands: Commands, keyboard_input: Res<Input<KeyCode>>, mut 
     // making sure it doesn't cause the paddle to leave the arena
     let left_bound = LEFT_WALL +  PADDLE_SIZE.x / 2.0;
     let right_bound = RIGHT_WALL - PADDLE_SIZE.x / 2.0;
+    let _upper_bound = TOP_WALL;
+    let _lower_bound = BOTTOM_WALL;
 
     player_transform.translation.x = new_player_position.clamp(left_bound, right_bound);
 }
 
-fn system_spawn_projectile(mut commands: Commands, keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut Transform, With<Player>>, mut projectile_query: Query<&Projectile>) {
-    let mut player_transform = query.single_mut();
-
-    if projectile_query.is_empty() {
-        if keyboard_input.pressed(KeyCode::Space) {
+fn system_spawn_projectile(mut commands: Commands, keyboard_input: Res<Input<KeyCode>>, query: Query<&Transform, With<Player>>, projectile_query: Query<&Projectile>) {
+    let player_transform = query.single();
+    
+    if projectile_query.is_empty() && keyboard_input.pressed(KeyCode::Space) {
         commands
-            .spawn()
-            .insert(Projectile)
-            .insert(Velocity(INITIAL_BALL_DIRECTION.normalize()))
-            .insert(LifeTime(3.0))
-            .insert_bundle(SpriteBundle {
-                transform: Transform {
+        .spawn()
+        .insert(Projectile)
+        .insert(Velocity(INITIAL_BALL_DIRECTION.normalize()))
+        .insert(LifeTime(3.0))
+        .insert_bundle(SpriteBundle {
+            transform: Transform {
                 translation: player_transform.translation,
                 scale: PROJECTILE_SIZE,
                 ..default()
@@ -164,19 +164,18 @@ fn system_spawn_projectile(mut commands: Commands, keyboard_input: Res<Input<Key
             ..default()
         });
     }
-    }
 }
 
-fn system_apply_velocity(mut commands: Commands, mut query: Query<(Entity, &mut Transform, &Velocity)>) {
-    for (entity, mut transform, velocity) in &mut query {
-        transform.translation.x = transform.translation.x + velocity.x;
-        transform.translation.y = transform.translation.y + velocity.y;
+fn system_apply_velocity(mut query: Query<(&mut Transform, &Velocity)>) {
+    for (mut transform, velocity) in &mut query {
+        transform.translation.x += velocity.x;
+        transform.translation.y += velocity.y;
     }
 }
 
 fn system_lifetime(mut commands: Commands, mut query: Query<(Entity, &mut LifeTime)>) {
     for (entity, mut lifetime) in &mut query {
-        lifetime.0 = lifetime.0 - TIME_STEP;
+        lifetime.0 -= TIME_STEP;
         if lifetime.0 <= 0.0 {
             commands.entity(entity).despawn();
         }
