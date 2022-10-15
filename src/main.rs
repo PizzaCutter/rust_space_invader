@@ -22,9 +22,12 @@ const INITIAL_BALL_DIRECTION: Vec2 = Vec2::new(0.0, 1.0);
 // INVADER DATA
 const INVADER_SIZE: Vec3 = Vec3::new(50.0, 50.0, 50.0);
 const INVADER_COLOR: Color = Color::rgb(0.7, 0.2, 0.2);
-const INVADER_TIME_STEP: f32 = 1.0;
+const INVADER_TIME_STEP: f32 = 0.1;
 const INVADER_MOVEMENT_STEP: f32 = 10.0;
 const INVADER_WALL_OFFSET: f32 = 50.0;
+const INVADER_COLUMNS : i32 = 9;
+const INVADER_ROWS : i32 = 3;
+const INVADER_OFFSET : f32 = 60.0;
 
 // x coordinates
 const LEFT_WALL: f32 = -600.;
@@ -217,24 +220,28 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(WallBundle::new(WallLocation::Top));
 
     // Spawning invaders
-    commands
-        .spawn()
-        .insert(Invader)
-        .insert(Collider)
-        .insert_bundle(SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(LEFT_WALL + INVADER_WALL_OFFSET, TOP_WALL - INVADER_WALL_OFFSET, 0.0),
-                scale: INVADER_SIZE,
+    for x in 0..INVADER_COLUMNS {
+        for y in 0..INVADER_ROWS {
+            commands
+            .spawn()
+            .insert(Invader)
+            .insert(Collider)
+            .insert_bundle(SpriteBundle {
+                transform: Transform {
+                    translation: Vec3::new(LEFT_WALL + INVADER_WALL_OFFSET + (x as f32 * INVADER_OFFSET), TOP_WALL - INVADER_WALL_OFFSET + (y as f32 * -INVADER_OFFSET), 0.0),
+                    scale: INVADER_SIZE,
+                    ..default()
+                },
+                sprite: Sprite {
+                    color: INVADER_COLOR,
+                    ..default()
+                },
                 ..default()
-            },
-            sprite: Sprite {
-                color: INVADER_COLOR,
-                ..default()
-            },
-            ..default()
-        });
-
-     // Scoreboard
+            });
+        }
+    }
+    
+    // Scoreboard
     commands.spawn_bundle(
         TextBundle::from_sections([
             TextSection::new(
@@ -329,7 +336,7 @@ fn system_lifetime(mut commands: Commands, mut query: Query<(Entity, &mut LifeTi
 fn check_for_collisions(
     mut _commands: Commands,
     mut projectile_query: Query<(&Transform, &mut LifeTime), With<Projectile>>,
-    collider_query: Query<(Entity, &Transform), With<Collider>>,
+    collider_query: Query<(Entity, &Transform, Option<&Invader>), With<Collider>>,
     mut collision_events: EventWriter<CollisionEvent>
 ) {
     if projectile_query.is_empty() {
@@ -339,7 +346,7 @@ fn check_for_collisions(
     let (projectile_transform, mut lifetime) = projectile_query.single_mut();
     let projectile_size = projectile_transform.scale.truncate();
 
-    for (_collider_entity, transform) in &collider_query {
+    for (_collider_entity, transform, maybe_invader) in &collider_query {
         let collision = collide(
             projectile_transform.translation,
             projectile_size,
@@ -366,6 +373,11 @@ fn check_for_collisions(
             if destroy_projectile {
                 lifetime.0 = 0.0;
             }
+
+            if maybe_invader.is_some() {
+                let mut entity = _commands.entity(_collider_entity);
+                entity.insert(LifeTime(0.0));
+            }
         }
     }
 
@@ -389,16 +401,25 @@ fn invader_mover(
     mut ai_mover: ResMut<AIMover>
 ) {
     ai_mover.time_before_move -= TIME_STEP;
-
     if ai_mover.time_before_move > 0.0 {
         return;
     }
-
     ai_mover.time_before_move = INVADER_TIME_STEP;
 
-    let movement_x = if ai_mover.direction == MovementDirection::Right{ INVADER_MOVEMENT_STEP } else { -INVADER_MOVEMENT_STEP };
+    let mut movement_x = if ai_mover.direction == MovementDirection::Right{ INVADER_MOVEMENT_STEP } else { -INVADER_MOVEMENT_STEP };
+    let mut movement_y = 0.0;
+    if ai_mover.position.x >= 0.0 {
+        movement_y = -INVADER_MOVEMENT_STEP;
+        movement_x = 0.0;
+        ai_mover.direction = if ai_mover.direction == MovementDirection::Right { MovementDirection::Left} else { MovementDirection::Right};
+        ai_mover.position.x = LEFT_WALL;
+    }
+
+    ai_mover.position.x += f32::abs(movement_x);
 
     for (_collider_entity, mut transform) in invader_query.iter_mut() {
         transform.translation.x += movement_x;
+        transform.translation.y += movement_y;
     }
+
 }
