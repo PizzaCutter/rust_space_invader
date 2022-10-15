@@ -19,6 +19,13 @@ const PROJECTILE_COLOR: Color = Color::rgb(0.3, 0.3, 0.7);
 const PROJECITLE_SPEED: f32 = 1000.0;
 const INITIAL_BALL_DIRECTION: Vec2 = Vec2::new(0.0, 1.0);
 
+// INVADER DATA
+const INVADER_SIZE: Vec3 = Vec3::new(50.0, 50.0, 50.0);
+const INVADER_COLOR: Color = Color::rgb(0.7, 0.2, 0.2);
+const INVADER_TIME_STEP: f32 = 1.0;
+const INVADER_MOVEMENT_STEP: f32 = 10.0;
+const INVADER_WALL_OFFSET: f32 = 50.0;
+
 // x coordinates
 const LEFT_WALL: f32 = -600.;
 const RIGHT_WALL: f32 = 600.;
@@ -57,9 +64,11 @@ impl Plugin for SpaceInvader{
                 .with_system(move_player.before(check_for_collisions))
                 .with_system(system_spawn_projectile.before(check_for_collisions))
                 .with_system(system_apply_velocity.before(check_for_collisions))
+                .with_system(invader_mover)
                 .with_system(check_for_collisions.before(system_lifetime))
                 .with_system(system_lifetime)
                 .with_system(play_collision_sound.after(system_lifetime))
+                //.with_system(invader_mover)
         )
         .add_system(bevy::window::close_on_esc);
     }
@@ -70,6 +79,9 @@ struct Velocity(Vec2);
 
 #[derive(Component)]
 struct Player;
+
+#[derive(Component)]
+struct Invader;
 
 #[derive(Component)]
 struct Projectile;
@@ -84,6 +96,18 @@ struct Collider;
 struct CollisionEvent;
 
 struct CollisionSound(Handle<AudioSource>);
+
+#[derive(PartialEq)]
+enum MovementDirection {
+    Left,
+    Right
+}
+
+struct AIMover{
+    direction : MovementDirection,
+    position: Vec3,
+    time_before_move: f32
+}
 
 #[derive(Bundle)]
 struct WallBundle {
@@ -162,6 +186,12 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let ball_collision_sound = asset_server.load("sounds/breakout_collision.ogg");
     commands.insert_resource(CollisionSound(ball_collision_sound));
 
+    // Add AI Mover 
+    commands.insert_resource(AIMover{
+        direction : MovementDirection::Right,
+        position : Vec3::new(LEFT_WALL, TOP_WALL, 0.0),
+        time_before_move : INVADER_TIME_STEP 
+    });
 
     // Spawning player
     commands
@@ -185,6 +215,24 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(WallBundle::new(WallLocation::Right));
     commands.spawn_bundle(WallBundle::new(WallLocation::Bottom));
     commands.spawn_bundle(WallBundle::new(WallLocation::Top));
+
+    // Spawning invaders
+    commands
+        .spawn()
+        .insert(Invader)
+        .insert(Collider)
+        .insert_bundle(SpriteBundle {
+            transform: Transform {
+                translation: Vec3::new(LEFT_WALL + INVADER_WALL_OFFSET, TOP_WALL - INVADER_WALL_OFFSET, 0.0),
+                scale: INVADER_SIZE,
+                ..default()
+            },
+            sprite: Sprite {
+                color: INVADER_COLOR,
+                ..default()
+            },
+            ..default()
+        });
 
      // Scoreboard
     commands.spawn_bundle(
@@ -336,3 +384,21 @@ fn play_collision_sound(
     }
 }
 
+fn invader_mover(
+    mut invader_query: Query<(Entity, &mut Transform), With<Invader>>,
+    mut ai_mover: ResMut<AIMover>
+) {
+    ai_mover.time_before_move -= TIME_STEP;
+
+    if ai_mover.time_before_move > 0.0 {
+        return;
+    }
+
+    ai_mover.time_before_move = INVADER_TIME_STEP;
+
+    let movement_x = if ai_mover.direction == MovementDirection::Right{ INVADER_MOVEMENT_STEP } else { -INVADER_MOVEMENT_STEP };
+
+    for (_collider_entity, mut transform) in invader_query.iter_mut() {
+        transform.translation.x += movement_x;
+    }
+}
